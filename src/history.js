@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 
 import { USER_CONFIG_DIR_NAME } from "./config.js";
 
@@ -22,6 +22,10 @@ export function formatHistoryDate(date = new Date()) {
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}${month}${day}`;
+}
+
+export function buildShortSessionId(sessionId) {
+  return typeof sessionId === "string" ? sessionId.split("-")[0] : "";
 }
 
 export function buildChatHistoryLines({
@@ -61,6 +65,8 @@ export function buildChatHistoryLines({
 
 export async function saveChatHistory(
   {
+    sessionId,
+    historyPath,
     message,
     response,
     model,
@@ -73,16 +79,18 @@ export async function saveChatHistory(
     mkdirImpl = mkdir,
     readFileImpl = readFile,
     writeFileImpl = writeFile,
+    appendFileImpl = appendFile,
     uuidGenerator = () => crypto.randomUUID()
   } = {}
 ) {
-  const sessionId = uuidGenerator();
-  const datePath = path.join(historiesRootPath, formatHistoryDate(createdAt));
-  const historyPath = path.join(datePath, `${sessionId}.jsonl`);
-  const relativeHistoryPath = path.relative(historiesRootPath, historyPath);
+  const nextSessionId = sessionId ?? uuidGenerator();
+  const nextRelativeHistoryPath = normalizeRelativeHistoryPath(
+    historyPath ?? `${formatHistoryDate(createdAt)}/${nextSessionId}.jsonl`
+  );
+  const absoluteHistoryPath = resolveAbsoluteHistoryPath(historiesRootPath, nextRelativeHistoryPath);
   const historiesIndexPath = path.join(historiesRootPath, USER_HISTORIES_INDEX_FILE_NAME);
   const lines = buildChatHistoryLines({
-    sessionId,
+    sessionId: nextSessionId,
     createdAt,
     message,
     response,
@@ -92,17 +100,25 @@ export async function saveChatHistory(
   });
   const content = `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`;
 
-  await mkdirImpl(datePath, { recursive: true });
-  await writeFileImpl(historyPath, content, {
-    encoding: "utf8",
-    flag: "w"
-  });
+  await mkdirImpl(path.dirname(absoluteHistoryPath), { recursive: true });
+
+  if (historyPath) {
+    await appendFileImpl(absoluteHistoryPath, content, {
+      encoding: "utf8"
+    });
+  } else {
+    await writeFileImpl(absoluteHistoryPath, content, {
+      encoding: "utf8",
+      flag: "w"
+    });
+  }
+
   await writeHistoryIndex(
     {
-      sessionId,
+      sessionId: nextSessionId,
       message,
       createdAt,
-      historyPath: relativeHistoryPath
+      historyPath: nextRelativeHistoryPath
     },
     {
       historiesIndexPath,
@@ -112,7 +128,12 @@ export async function saveChatHistory(
     }
   );
 
-  return historyPath;
+  return {
+    sessionId: nextSessionId,
+    shortSessionId: buildShortSessionId(nextSessionId),
+    historyPath: absoluteHistoryPath,
+    relativeHistoryPath: nextRelativeHistoryPath
+  };
 }
 
 export async function writeHistoryIndex(
@@ -139,7 +160,7 @@ export async function writeHistoryIndex(
     startMessage: message,
     createTime: createdAt.toISOString(),
     updateTime: createdAt.toISOString(),
-    historyPath
+    historyPath: normalizeRelativeHistoryPath(historyPath)
   });
 
   await mkdirImpl(path.dirname(historiesIndexPath), { recursive: true });
@@ -180,8 +201,62 @@ export function parseHistoryIndex(rawContent) {
   return parsed.map(normalizeHistoryIndexEntry);
 }
 
+export function resolveHistoryIndexEntry(items, sessionRef) {
+  const normalizedRef = typeof sessionRef === "string" ? sessionRef.trim() : "";
+
+  if (!normalizedRef) {
+    throw new Error("sessionId is required");
+  }
+
+  const exactMatch = items.find((item) => item.sessionId === normalizedRef);
+
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  const shortMatches = items.filter((item) => buildShortSessionId(item.sessionId) === normalizedRef);
+
+  if (shortMatches.length === 1) {
+    return shortMatches[0];
+  }
+
+  if (shortMatches.length > 1) {
+    throw new Error(`sessionId is ambiguous: ${normalizedRef}`);
+  }
+
+  throw new Error(`session not found: ${normalizedRef}`);
+}
+
+export async function readChatHistoryMessages(
+  historyEntry,
+  {
+    historiesRootPath = getUserHistoriesRootPath(),
+    readFileImpl = readFile
+  } = {}
+) {
+  const historyPath = resolveAbsoluteHistoryPath(historiesRootPath, historyEntry.historyPath);
+  const rawContent = await readFileImpl(historyPath, "utf8");
+  const lines = parseChatHistoryContent(rawContent);
+
+  return lines
+    .filter((line) => line.role === "user" || line.role === "assistant")
+    .map((line) => ({
+      role: line.role,
+      content: line.content
+    }));
+}
+
+export function parseChatHistoryContent(rawContent) {
+  return rawContent
+    .split(/\r?\n/)
+    .filter((line) => line.trim() !== "")
+    .map((line) => JSON.parse(line));
+}
+
 export function upsertHistoryIndexEntry(items, nextItem) {
-  const existingIndex = items.findIndex((item) => item.historyPath === nextItem.historyPath);
+  const existingIndex = items.findIndex(
+    (item) => item.sessionId === nextItem.sessionId || item.historyPath === nextItem.historyPath
+  );
 
   if (existingIndex === -1) {
     return [nextItem, ...items];
@@ -190,19 +265,41 @@ export function upsertHistoryIndexEntry(items, nextItem) {
   const existingItem = items[existingIndex];
   const updatedItem = {
     ...existingItem,
-    updateTime: nextItem.updateTime
+    sessionId: existingItem.sessionId || nextItem.sessionId,
+    updateTime: nextItem.updateTime,
+    historyPath: nextItem.historyPath
   };
 
   return items.map((item, index) => (index === existingIndex ? updatedItem : item));
 }
 
 function normalizeHistoryIndexEntry(item) {
+  const historyPath = normalizeRelativeHistoryPath(typeof item?.historyPath === "string" ? item.historyPath : "");
+  const sessionId = typeof item?.sessionId === "string" && item.sessionId !== ""
+    ? item.sessionId
+    : deriveSessionIdFromHistoryPath(historyPath);
+
   return {
-    sessionId: typeof item?.sessionId === "string" ? item.sessionId : "",
+    sessionId,
     title: typeof item?.title === "string" ? item.title : "",
     startMessage: typeof item?.startMessage === "string" ? item.startMessage : "",
     createTime: typeof item?.createTime === "string" ? item.createTime : "",
     updateTime: typeof item?.updateTime === "string" ? item.updateTime : "",
-    historyPath: typeof item?.historyPath === "string" ? item.historyPath : ""
+    historyPath
   };
+}
+
+function deriveSessionIdFromHistoryPath(historyPath) {
+  const baseName = historyPath.split("/").pop() ?? "";
+  return baseName.endsWith(".jsonl") ? baseName.slice(0, -6) : "";
+}
+
+function normalizeRelativeHistoryPath(relativeHistoryPath) {
+  return String(relativeHistoryPath)
+    .trim()
+    .replace(/\\/g, "/");
+}
+
+function resolveAbsoluteHistoryPath(historiesRootPath, relativeHistoryPath) {
+  return path.join(historiesRootPath, ...normalizeRelativeHistoryPath(relativeHistoryPath).split("/"));
 }

@@ -11,6 +11,7 @@ export async function createTemporaryChatCompletion({
   baseUrl,
   model,
   message,
+  priorMessages = [],
   systemPrompt,
   stream = true,
   onDelta,
@@ -25,6 +26,7 @@ export async function createTemporaryChatCompletion({
     });
   }
 
+  messages.push(...normalizePriorMessages(priorMessages));
   messages.push({
     role: "user",
     content: message
@@ -160,4 +162,22 @@ function extractTextSegments(content) {
 
       return "";
     });
+}
+
+function normalizePriorMessages(priorMessages) {
+  if (!Array.isArray(priorMessages)) {
+    return [];
+  }
+
+  return priorMessages
+    .filter(
+      (message) =>
+        (message?.role === "user" || message?.role === "assistant") &&
+        typeof message?.content === "string" &&
+        message.content.trim() !== ""
+    )
+    .map((message) => ({
+      role: message.role,
+      content: message.content
+    }));
 }

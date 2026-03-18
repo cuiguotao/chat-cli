@@ -132,6 +132,12 @@ test("createTemporaryChatCompletion supports non-stream responses", async () => 
       baseUrl: `http://127.0.0.1:${address.port}/v1`,
       model: "test-model",
       message: "你好",
+      priorMessages: [
+        {
+          role: "assistant",
+          content: "上一轮回复"
+        }
+      ],
       systemPrompt: "你是一个助手",
       stream: false
     });
@@ -144,6 +150,10 @@ test("createTemporaryChatCompletion supports non-stream responses", async () => 
       {
         role: "system",
         content: "你是一个助手"
+      },
+      {
+        role: "assistant",
+        content: "上一轮回复"
       },
       {
         role: "user",

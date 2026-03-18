@@ -63,6 +63,11 @@ chat "你好"
 ```powershell
 chat --model your-model-name --base-url https://api.openai.com/v1 "你好"
 chat --system "你是一个简洁的助手" "解释一下 CLI 的作用"
+chat --history list
+chat --history show 12345678
+chat --load 12345678
+chat --session 12345678 "继续这个会话"
+chat --multi "开始一个多轮会话"
 chat --config stream=false
 ```
 
@@ -103,8 +108,65 @@ chat --config stream=true
 }
 ```
 
+其中：
+- `sessionId` 是完整 uuid
+- 在命令行里可以直接使用它的短 id，也就是 uuid 第一段，例如 `12345678`
+- `historyPath` 是相对于 `~/.chat-cli/histories` 的相对路径
+
+## 历史与多轮会话
+
+查看历史会话列表：
+
+```powershell
+chat --history list
+```
+
+查看某个历史会话内容：
+
+```powershell
+chat --history show 12345678
+```
+
+输出列为：
+
+```text
+sessionId  title  updateTime
+```
+
+这里的 `sessionId` 会显示短 id，便于复制。
+
+加载某个历史会话到当前终端窗口：
+
+```powershell
+chat --load 12345678
+```
+
+加载之后，如果后续执行 `chat "下一句话"` 时没有显式传 `--session`，CLI 会优先继续当前终端窗口里已加载的会话。
+
+显式继续某个历史会话：
+
+```powershell
+chat --session 12345678 "继续这个会话"
+```
+
+开始一个新的多轮会话：
+
+```powershell
+chat --multi "开始一个多轮会话"
+```
+
+这会：
+- 创建一个新的 `sessionId`
+- 把本轮问答保存到对应的历史文件
+- 将这个 `sessionId` 绑定到当前终端窗口，后续直接执行 `chat "..."` 会继续这个会话
+
+说明：
+- 如果没有执行过 `--load`，也没有用 `--multi` 开始一个新会话，那么普通的 `chat "message"` 就是单轮会话
+- `chat --session ...` 只针对当前这次调用显式指定会话
+- 由于 CLI 进程不能直接修改父级 shell 的真实环境变量，这里的“当前终端临时会话”是用终端作用域状态实现的；对 `chat` 命令的使用效果等同于当前窗口内的临时会话变量
+
 每个文件保存一次命令对应的对话，默认包含两行 JSON：
 - `user`
 - `assistant`
 
-这个版本是临时对话模式，每次执行只发送当前输入，并自动保存本次历史。
+单轮模式下，每次执行只发送当前输入；多轮模式下，会自动把历史消息一并带上。
