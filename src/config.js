@@ -8,7 +8,8 @@ export const DEFAULT_USER_CONFIG = {
   apiKey: "",
   model: "",
   baseUrl: "",
-  systemPrompt: ""
+  systemPrompt: "",
+  stream: true
 };
 
 export function getUserConfigPath(homeDir = os.homedir()) {
@@ -42,6 +43,24 @@ export async function readUserConfig({
   }
 }
 
+export async function writeUserConfig(
+  config,
+  {
+    configPath = getUserConfigPath(),
+    mkdirImpl = mkdir,
+    writeFileImpl = writeFile
+  } = {}
+) {
+  const normalizedConfig = normalizeUserConfig(config);
+  const content = `${JSON.stringify(toConfigFileObject(normalizedConfig), null, 2)}\n`;
+
+  await mkdirImpl(path.dirname(configPath), { recursive: true });
+  await writeFileImpl(configPath, content, {
+    encoding: "utf8",
+    flag: "w"
+  });
+}
+
 export function parseUserConfig(rawContent) {
   const parsed = JSON.parse(rawContent);
 
@@ -53,7 +72,28 @@ export function parseUserConfig(rawContent) {
     apiKey: normalizeString(parsed.apiKey),
     baseUrl: normalizeString(parsed.baseUrl),
     model: normalizeString(parsed.model),
-    systemPrompt: normalizeString(parsed.systemPrompt)
+    systemPrompt: normalizeString(parsed.systemPrompt),
+    stream: normalizeBoolean(parsed.stream)
+  };
+}
+
+export function normalizeUserConfig(config = {}) {
+  return {
+    apiKey: normalizeString(config.apiKey),
+    baseUrl: normalizeString(config.baseUrl),
+    model: normalizeString(config.model),
+    systemPrompt: normalizeString(config.systemPrompt),
+    stream: normalizeBoolean(config.stream)
+  };
+}
+
+function toConfigFileObject(config) {
+  return {
+    apiKey: config.apiKey ?? "",
+    model: config.model ?? "",
+    baseUrl: config.baseUrl ?? "",
+    systemPrompt: config.systemPrompt ?? "",
+    stream: config.stream ?? true
   };
 }
 
@@ -68,4 +108,26 @@ function normalizeString(value) {
 
   const trimmedValue = value.trim();
   return trimmedValue === "" ? undefined : trimmedValue;
+}
+
+function normalizeBoolean(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+
+  if (normalizedValue === "true") {
+    return true;
+  }
+
+  if (normalizedValue === "false") {
+    return false;
+  }
+
+  return undefined;
 }

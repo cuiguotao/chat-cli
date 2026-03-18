@@ -4,8 +4,10 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_USER_CONFIG,
   getUserConfigPath,
+  normalizeUserConfig,
   parseUserConfig,
-  readUserConfig
+  readUserConfig,
+  writeUserConfig
 } from "./config.js";
 
 test("getUserConfigPath points to the user home config file", () => {
@@ -35,7 +37,8 @@ test("readUserConfig creates the config directory and file when missing", async 
     apiKey: undefined,
     baseUrl: undefined,
     model: undefined,
-    systemPrompt: undefined
+    systemPrompt: undefined,
+    stream: true
   });
   assert.deepEqual(mkdirCalls, [
     {
@@ -60,7 +63,8 @@ test("readUserConfig parses supported fields", async () => {
         apiKey: " config-key ",
         baseUrl: " https://config.example/v1 ",
         model: " config-model ",
-        systemPrompt: " 你是一个助手 "
+        systemPrompt: " 你是一个助手 ",
+        stream: false
       })
   });
 
@@ -68,10 +72,61 @@ test("readUserConfig parses supported fields", async () => {
     apiKey: "config-key",
     baseUrl: "https://config.example/v1",
     model: "config-model",
-    systemPrompt: "你是一个助手"
+    systemPrompt: "你是一个助手",
+    stream: false
   });
 });
 
 test("parseUserConfig rejects invalid json structures", () => {
   assert.throws(() => parseUserConfig("[]"), /config file must contain a JSON object/i);
+});
+
+test("normalizeUserConfig supports string booleans", () => {
+  assert.deepEqual(normalizeUserConfig({ stream: "false" }), {
+    apiKey: undefined,
+    baseUrl: undefined,
+    model: undefined,
+    systemPrompt: undefined,
+    stream: false
+  });
+});
+
+test("writeUserConfig persists normalized values", async () => {
+  const writeFileCalls = [];
+
+  await writeUserConfig(
+    {
+      apiKey: " test-key ",
+      model: "test-model",
+      stream: false
+    },
+    {
+      configPath: "C:\\Users\\Demo\\.chat-cli\\config.json",
+      mkdirImpl: async () => {},
+      writeFileImpl: async (filePath, content, options) => {
+        writeFileCalls.push({ filePath, content, options });
+      }
+    }
+  );
+
+  assert.equal(writeFileCalls.length, 1);
+  assert.equal(writeFileCalls[0].filePath, "C:\\Users\\Demo\\.chat-cli\\config.json");
+  assert.equal(
+    writeFileCalls[0].content,
+    `${JSON.stringify(
+      {
+        apiKey: "test-key",
+        model: "test-model",
+        baseUrl: "",
+        systemPrompt: "",
+        stream: false
+      },
+      null,
+      2
+    )}\n`
+  );
+  assert.deepEqual(writeFileCalls[0].options, {
+    encoding: "utf8",
+    flag: "w"
+  });
 });

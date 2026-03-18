@@ -25,7 +25,8 @@ Windows 下实际路径通常是 `C:\Users\你的用户名\.chat-cli\config.json
   "apiKey": "your-api-key",
   "model": "your-model-name",
   "baseUrl": "https://api.openai.com/v1",
-  "systemPrompt": "你是一个简洁的助手"
+  "systemPrompt": "你是一个简洁的助手",
+  "stream": true
 }
 ```
 
@@ -39,6 +40,7 @@ Windows 下实际路径通常是 `C:\Users\你的用户名\.chat-cli\config.json
 $env:OPENAI_API_KEY = "your-api-key"
 $env:OPENAI_MODEL = "your-model-name"
 $env:OPENAI_BASE_URL = "https://api.openai.com/v1"
+$env:OPENAI_STREAM = "true"
 ```
 
 ## 启动方式
@@ -61,6 +63,19 @@ chat "你好"
 ```powershell
 chat --model your-model-name --base-url https://api.openai.com/v1 "你好"
 chat --system "你是一个简洁的助手" "解释一下 CLI 的作用"
+chat --config stream=false
+```
+
+`stream` 默认是开启的。要永久关闭流式输出，可以执行：
+
+```powershell
+chat --config stream=false
+```
+
+重新开启：
+
+```powershell
+chat --config stream=true
 ```
 
 这个版本是临时对话模式，每次执行只发送当前输入，不保存历史。
