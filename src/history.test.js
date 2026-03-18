@@ -24,7 +24,7 @@ test("formatHistoryDate uses local calendar date", () => {
 
 test("buildChatHistoryLines creates user and assistant entries", () => {
   const lines = buildChatHistoryLines({
-    historyId: "test-id",
+    sessionId: "test-session-id",
     createdAt: new Date("2026-03-18T09:30:00.000Z"),
     message: "你好",
     response: "你好，我在。",
@@ -35,7 +35,8 @@ test("buildChatHistoryLines creates user and assistant entries", () => {
 
   assert.deepEqual(lines, [
     {
-      id: "test-id",
+      id: "test-session-id",
+      sessionId: "test-session-id",
       role: "user",
       content: "你好",
       createdAt: "2026-03-18T09:30:00.000Z",
@@ -44,7 +45,8 @@ test("buildChatHistoryLines creates user and assistant entries", () => {
       systemPrompt: "简洁回答"
     },
     {
-      id: "test-id",
+      id: "test-session-id",
+      sessionId: "test-session-id",
       role: "assistant",
       content: "你好，我在。",
       createdAt: "2026-03-18T09:30:00.000Z",
@@ -106,6 +108,7 @@ test("saveChatHistory stores the chat under a dated uuid file", async () => {
     writeFileCalls[0].content,
     `${JSON.stringify({
       id: "test-uuid",
+      sessionId: "test-uuid",
       role: "user",
       content: "你好",
       createdAt: "2026-03-18T09:30:00.000Z",
@@ -114,6 +117,7 @@ test("saveChatHistory stores the chat under a dated uuid file", async () => {
       systemPrompt: "简洁回答"
     })}\n${JSON.stringify({
       id: "test-uuid",
+      sessionId: "test-uuid",
       role: "assistant",
       content: "你好，我在。",
       createdAt: "2026-03-18T09:30:00.000Z",
@@ -132,6 +136,7 @@ test("saveChatHistory stores the chat under a dated uuid file", async () => {
     `${JSON.stringify(
       [
         {
+          sessionId: "test-uuid",
           title: "你好",
           startMessage: "你好",
           createTime: "2026-03-18T09:30:00.000Z",
@@ -168,6 +173,7 @@ test("saveChatHistory updates histories.json while preserving existing createTim
         if (filePath.endsWith("histories.json")) {
           return JSON.stringify([
             {
+              sessionId: "test-uuid",
               title: "旧标题",
               startMessage: "旧消息",
               createTime: "2026-03-18T09:30:00.000Z",
@@ -192,6 +198,7 @@ test("saveChatHistory updates histories.json while preserving existing createTim
     `${JSON.stringify(
       [
         {
+          sessionId: "test-uuid",
           title: "旧标题",
           startMessage: "旧消息",
           createTime: "2026-03-18T09:30:00.000Z",

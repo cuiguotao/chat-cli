@@ -25,7 +25,7 @@ export function formatHistoryDate(date = new Date()) {
 }
 
 export function buildChatHistoryLines({
-  historyId,
+  sessionId,
   createdAt,
   message,
   response,
@@ -37,7 +37,8 @@ export function buildChatHistoryLines({
 
   return [
     {
-      id: historyId,
+      id: sessionId,
+      sessionId,
       role: "user",
       content: message,
       createdAt: timestamp,
@@ -46,7 +47,8 @@ export function buildChatHistoryLines({
       systemPrompt
     },
     {
-      id: historyId,
+      id: sessionId,
+      sessionId,
       role: "assistant",
       content: response,
       createdAt: timestamp,
@@ -74,13 +76,13 @@ export async function saveChatHistory(
     uuidGenerator = () => crypto.randomUUID()
   } = {}
 ) {
-  const historyId = uuidGenerator();
+  const sessionId = uuidGenerator();
   const datePath = path.join(historiesRootPath, formatHistoryDate(createdAt));
-  const historyPath = path.join(datePath, `${historyId}.jsonl`);
+  const historyPath = path.join(datePath, `${sessionId}.jsonl`);
   const relativeHistoryPath = path.relative(historiesRootPath, historyPath);
   const historiesIndexPath = path.join(historiesRootPath, USER_HISTORIES_INDEX_FILE_NAME);
   const lines = buildChatHistoryLines({
-    historyId,
+    sessionId,
     createdAt,
     message,
     response,
@@ -97,6 +99,7 @@ export async function saveChatHistory(
   });
   await writeHistoryIndex(
     {
+      sessionId,
       message,
       createdAt,
       historyPath: relativeHistoryPath
@@ -114,6 +117,7 @@ export async function saveChatHistory(
 
 export async function writeHistoryIndex(
   {
+    sessionId,
     message,
     createdAt = new Date(),
     historyPath
@@ -130,6 +134,7 @@ export async function writeHistoryIndex(
     readFileImpl
   });
   const nextItems = upsertHistoryIndexEntry(items, {
+    sessionId,
     title: message,
     startMessage: message,
     createTime: createdAt.toISOString(),
@@ -193,6 +198,7 @@ export function upsertHistoryIndexEntry(items, nextItem) {
 
 function normalizeHistoryIndexEntry(item) {
   return {
+    sessionId: typeof item?.sessionId === "string" ? item.sessionId : "",
     title: typeof item?.title === "string" ? item.title : "",
     startMessage: typeof item?.startMessage === "string" ? item.startMessage : "",
     createTime: typeof item?.createTime === "string" ? item.createTime : "",

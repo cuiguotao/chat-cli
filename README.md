@@ -94,6 +94,7 @@ chat --config stream=true
 
 ```json
 {
+  "sessionId": "<uuid>",
   "title": "用户第一条消息",
   "startMessage": "用户第一条消息",
   "createTime": "2026-03-18T09:30:00.000Z",
