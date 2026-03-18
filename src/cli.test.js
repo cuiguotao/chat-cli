@@ -112,6 +112,11 @@ test("runCli writes model output to stdout", async () => {
       }
     },
     loadUserConfig: async () => ({}),
+    persistHistory: async ({ message, response, model }) => {
+      assert.equal(message, "你好");
+      assert.equal(response, "你好，我在。");
+      assert.equal(model, "test-model");
+    },
     renderMarkdown: () => {
       throw new Error("renderMarkdown should not be used for non-tty output");
     },
@@ -150,6 +155,10 @@ test("runCli renders markdown when stream is disabled", async () => {
     loadUserConfig: async () => ({
       stream: false
     }),
+    persistHistory: async ({ message, response }) => {
+      assert.equal(message, "你好");
+      assert.equal(response, "# 标题\n\n- 第一项");
+    },
     renderMarkdown: (markdown, { columns }) => {
       assert.equal(markdown, "# 标题\n\n- 第一项");
       assert.equal(columns, 120);
@@ -187,6 +196,9 @@ test("runCli uses raw fallback output if a streaming implementation does not emi
       }
     },
     loadUserConfig: async () => ({}),
+    persistHistory: async ({ response }) => {
+      assert.equal(response, "# 标题\n\n- 第一项");
+    },
     chat: async () => "# 标题\n\n- 第一项"
   });
 
@@ -243,6 +255,9 @@ test("runCli updates user config from --config without calling the model", async
     saveUserConfig: async (config) => {
       savedConfig = config;
     },
+    persistHistory: async () => {
+      throw new Error("persistHistory should not be called when updating config");
+    },
     chat: async () => {
       throw new Error("chat should not be called when updating config");
     }
@@ -280,6 +295,10 @@ test("runCli loads user config and lets it override environment variables", asyn
       systemPrompt: "来自配置文件",
       stream: false
     }),
+    persistHistory: async ({ baseUrl, systemPrompt }) => {
+      assert.equal(baseUrl, "https://config.example/v1");
+      assert.equal(systemPrompt, "来自配置文件");
+    },
     chat: async (config) => {
       assert.equal(config.apiKey, "config-key");
       assert.equal(config.model, "config-model");
@@ -293,4 +312,37 @@ test("runCli loads user config and lets it override environment variables", asyn
 
   assert.equal(exitCode, 0);
   assert.equal(stdout, "配置读取成功\n");
+});
+
+test("runCli continues when history persistence fails", async () => {
+  let stdout = "";
+  let stderr = "";
+
+  const exitCode = await runCli(["chat", "你好"], {
+    env: {
+      OPENAI_API_KEY: "test-key",
+      OPENAI_MODEL: "test-model"
+    },
+    stdout: {
+      write(chunk) {
+        stdout += chunk;
+      }
+    },
+    stderr: {
+      write(chunk) {
+        stderr += chunk;
+      }
+    },
+    loadUserConfig: async () => ({
+      stream: false
+    }),
+    persistHistory: async () => {
+      throw new Error("disk full");
+    },
+    chat: async () => "普通回复"
+  });
+
+  assert.equal(exitCode, 0);
+  assert.equal(stdout, "普通回复\n");
+  assert.match(stderr, /failed to save chat history: disk full/i);
 });

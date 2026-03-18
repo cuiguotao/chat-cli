@@ -78,4 +78,32 @@ chat --config stream=false
 chat --config stream=true
 ```
 
-这个版本是临时对话模式，每次执行只发送当前输入，不保存历史。
+每次成功对话后，CLI 会把原始问答保存到用户目录下的历史文件中：
+
+```text
+~/.chat-cli/histories/20260318/<uuid>.jsonl
+```
+
+同时会在历史根目录维护一个索引文件：
+
+```text
+~/.chat-cli/histories/histories.json
+```
+
+索引项结构为：
+
+```json
+{
+  "title": "用户第一条消息",
+  "startMessage": "用户第一条消息",
+  "createTime": "2026-03-18T09:30:00.000Z",
+  "updateTime": "2026-03-18T09:30:00.000Z",
+  "historyPath": "20260318/<uuid>.jsonl"
+}
+```
+
+每个文件保存一次命令对应的对话，默认包含两行 JSON：
+- `user`
+- `assistant`
+
+这个版本是临时对话模式，每次执行只发送当前输入，并自动保存本次历史。

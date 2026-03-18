@@ -1,5 +1,6 @@
 import { createTemporaryChatCompletion } from "./openai-chat.js";
 import { getUserConfigPath, readUserConfig, writeUserConfig } from "./config.js";
+import { saveChatHistory } from "./history.js";
 import { renderMarkdownForTerminal } from "./terminal-markdown.js";
 
 const HELP_TEXT = `Usage:
@@ -29,6 +30,7 @@ export async function runCli(
     chat = createTemporaryChatCompletion,
     loadUserConfig = readUserConfig,
     saveUserConfig = writeUserConfig,
+    persistHistory = saveChatHistory,
     renderMarkdown = renderMarkdownForTerminal
   } = {}
 ) {
@@ -78,6 +80,19 @@ export async function runCli(
         }
       : undefined
   });
+
+  try {
+    await persistHistory({
+      message: config.message,
+      response,
+      model: config.model,
+      baseUrl: config.baseUrl,
+      systemPrompt: config.systemPrompt
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    stderr.write(`Warning: failed to save chat history: ${message}\n`);
+  }
 
   if (config.stream) {
     if (!hasStreamedOutput) {
