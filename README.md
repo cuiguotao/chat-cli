@@ -7,12 +7,18 @@
 这个工具会按下面的优先级读取配置：
 
 1. 命令行参数
-2. 用户目录配置文件 `C:\Users\WILL\.chat-cli.json`
+2. 用户目录配置文件 `~/.chat-cli/config.json`
 3. 环境变量
 
 ### 方式 1：用户目录配置文件
 
-在用户目录创建 `C:\Users\WILL\.chat-cli.json`：
+配置文件固定在 `~/.chat-cli/config.json`。
+
+如果目录或文件不存在，CLI 会在首次运行时自动创建。
+
+Windows 下实际路径通常是 `C:\Users\你的用户名\.chat-cli\config.json`。
+
+文件内容示例：
 
 ```json
 {

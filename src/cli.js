@@ -7,6 +7,7 @@ const HELP_TEXT = `Usage:
 
 User config:
   ${getUserConfigPath()}
+  Created automatically on first run if missing.
   Values in this file override environment variables.
 
 Environment variables:
