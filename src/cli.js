@@ -1,5 +1,6 @@
 import { createTemporaryChatCompletion } from "./openai-chat.js";
 import { getUserConfigPath, readUserConfig } from "./config.js";
+import { renderMarkdownForTerminal } from "./terminal-markdown.js";
 
 const HELP_TEXT = `Usage:
   chat "Your message"
@@ -24,7 +25,8 @@ export async function runCli(
     stdout = process.stdout,
     stderr = process.stderr,
     chat = createTemporaryChatCompletion,
-    loadUserConfig = readUserConfig
+    loadUserConfig = readUserConfig,
+    renderMarkdown = renderMarkdownForTerminal
   } = {}
 ) {
   const args = rawArgs[0] === "chat" ? rawArgs.slice(1) : rawArgs;
@@ -45,7 +47,11 @@ export async function runCli(
   const userConfig = await loadUserConfig();
   const config = resolveConfig(options, env, userConfig);
   const response = await chat(config);
-  stdout.write(`${response}\n`);
+  const renderedResponse = stdout.isTTY
+    ? renderMarkdown(response, { columns: stdout.columns })
+    : response;
+
+  stdout.write(`${renderedResponse}\n`);
 
   return 0;
 }

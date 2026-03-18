@@ -98,6 +98,9 @@ test("runCli writes model output to stdout", async () => {
       }
     },
     loadUserConfig: async () => ({}),
+    renderMarkdown: () => {
+      throw new Error("renderMarkdown should not be used for non-tty output");
+    },
     chat: async (config) => {
       assert.equal(config.message, "你好");
       return "你好，我在。";
@@ -106,6 +109,41 @@ test("runCli writes model output to stdout", async () => {
 
   assert.equal(exitCode, 0);
   assert.equal(stdout, "你好，我在。\n");
+  assert.equal(stderr, "");
+});
+
+test("runCli renders markdown when stdout is a tty", async () => {
+  let stdout = "";
+  let stderr = "";
+
+  const exitCode = await runCli(["chat", "你好"], {
+    env: {
+      OPENAI_API_KEY: "test-key",
+      OPENAI_MODEL: "test-model"
+    },
+    stdout: {
+      isTTY: true,
+      columns: 120,
+      write(chunk) {
+        stdout += chunk;
+      }
+    },
+    stderr: {
+      write(chunk) {
+        stderr += chunk;
+      }
+    },
+    loadUserConfig: async () => ({}),
+    renderMarkdown: (markdown, { columns }) => {
+      assert.equal(markdown, "# 标题\n\n- 第一项");
+      assert.equal(columns, 120);
+      return "渲染后的终端内容";
+    },
+    chat: async () => "# 标题\n\n- 第一项"
+  });
+
+  assert.equal(exitCode, 0);
+  assert.equal(stdout, "渲染后的终端内容\n");
   assert.equal(stderr, "");
 });
 
