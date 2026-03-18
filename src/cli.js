@@ -1,8 +1,13 @@
 import { createTemporaryChatCompletion } from "./openai-chat.js";
+import { getUserConfigPath, readUserConfig } from "./config.js";
 
 const HELP_TEXT = `Usage:
   chat "Your message"
   chat --model your-model-name --base-url https://api.openai.com/v1 "Hello"
+
+User config:
+  ${getUserConfigPath()}
+  Values in this file override environment variables.
 
 Environment variables:
   OPENAI_API_KEY   Required API key
@@ -17,7 +22,8 @@ export async function runCli(
     env = process.env,
     stdout = process.stdout,
     stderr = process.stderr,
-    chat = createTemporaryChatCompletion
+    chat = createTemporaryChatCompletion,
+    loadUserConfig = readUserConfig
   } = {}
 ) {
   const args = rawArgs[0] === "chat" ? rawArgs.slice(1) : rawArgs;
@@ -35,7 +41,8 @@ export async function runCli(
     return 1;
   }
 
-  const config = resolveConfig(options, env);
+  const userConfig = await loadUserConfig();
+  const config = resolveConfig(options, env, userConfig);
   const response = await chat(config);
   stdout.write(`${response}\n`);
 
@@ -87,9 +94,9 @@ export function parseArgs(args) {
   };
 }
 
-export function resolveConfig(options, env) {
-  const apiKey = options.apiKey ?? env.OPENAI_API_KEY;
-  const model = options.model ?? env.OPENAI_MODEL;
+export function resolveConfig(options, env, userConfig = {}) {
+  const apiKey = options.apiKey ?? userConfig.apiKey ?? env.OPENAI_API_KEY;
+  const model = options.model ?? userConfig.model ?? env.OPENAI_MODEL;
 
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is required. Use --api-key or set the environment variable.");
@@ -102,8 +109,8 @@ export function resolveConfig(options, env) {
   return {
     apiKey,
     model,
-    baseUrl: options.baseUrl ?? env.OPENAI_BASE_URL ?? "https://api.openai.com/v1",
-    systemPrompt: options.systemPrompt ?? env.OPENAI_SYSTEM,
+    baseUrl: options.baseUrl ?? userConfig.baseUrl ?? env.OPENAI_BASE_URL ?? "https://api.openai.com/v1",
+    systemPrompt: options.systemPrompt ?? userConfig.systemPrompt ?? env.OPENAI_SYSTEM,
     message: options.message
   };
 }

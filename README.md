@@ -4,7 +4,30 @@
 
 ## 使用前准备
 
-设置环境变量：
+这个工具会按下面的优先级读取配置：
+
+1. 命令行参数
+2. 用户目录配置文件 `C:\Users\WILL\.chat-cli.json`
+3. 环境变量
+
+### 方式 1：用户目录配置文件
+
+在用户目录创建 `C:\Users\WILL\.chat-cli.json`：
+
+```json
+{
+  "apiKey": "your-api-key",
+  "model": "your-model-name",
+  "baseUrl": "https://api.openai.com/v1",
+  "systemPrompt": "你是一个简洁的助手"
+}
+```
+
+这个文件中的值会覆盖同名环境变量。
+
+### 方式 2：环境变量
+
+如果你不想写配置文件，也可以继续使用环境变量：
 
 ```powershell
 $env:OPENAI_API_KEY = "your-api-key"
