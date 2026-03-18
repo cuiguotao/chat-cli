@@ -90,6 +90,8 @@ chat --system "You are a concise assistant" "Explain what this CLI does"
 chat --history list
 chat --history show 12345678
 chat --load 12345678
+chat --current
+chat --clear
 chat --session 12345678 "Continue this conversation"
 chat --multi "Start a multi-turn conversation"
 chat --config stream=false
@@ -169,6 +171,22 @@ chat --load 12345678
 ```
 
 After loading, if you run `chat "next message"` without `--session`, the CLI will continue the session already loaded in the current terminal window.
+
+Show the session currently active in the current terminal window:
+
+```powershell
+chat --current
+```
+
+If the terminal already has an active session, the CLI shows the full `sessionId`, short id, title, and update time. If there is no active session, it prints `No current session`.
+
+Clear the currently loaded session in the current terminal window:
+
+```powershell
+chat --clear
+```
+
+After that, the current terminal returns to the "no active session" state. A normal `chat "message"` call will behave as a single-turn conversation again until you use `--load` or `--multi` again. This command does not delete any history files.
 
 Explicitly continue a specific session:
 

@@ -9,6 +9,7 @@ import {
 } from "./history.js";
 import {
   ACTIVE_SESSION_ENV_NAME,
+  clearActiveSessionId,
   getActiveSessionId,
   getShellSessionScopeId,
   setActiveSessionId
@@ -20,6 +21,8 @@ const HELP_TEXT = `Usage:
   chat --multi "Start a multi-turn session"
   chat --session sessionId "Continue a session"
   chat --load sessionId
+  chat --current
+  chat --clear
   chat --history list
   chat --history show sessionId
   chat --config stream=false
@@ -54,6 +57,7 @@ export async function runCli(
     getShellScopeId = getShellSessionScopeId,
     getLoadedSessionId = getActiveSessionId,
     saveLoadedSessionId = setActiveSessionId,
+    clearLoadedSessionId = clearActiveSessionId,
     renderMarkdown = renderMarkdownForTerminal
   } = {}
 ) {
@@ -104,6 +108,27 @@ export async function runCli(
   }
 
   const shellScopeId = getShellScopeId({ env });
+  const sessionRefFromEnv = readSessionRefFromEnv(env);
+
+  if (options.current) {
+    const loadedSessionRef = sessionRefFromEnv ?? (await getLoadedSessionId(shellScopeId));
+
+    if (!loadedSessionRef) {
+      stdout.write("No current session\n");
+      return 0;
+    }
+
+    const historyItems = await loadHistoryIndex();
+    const historyEntry = resolveHistoryEntry(historyItems, loadedSessionRef);
+    stdout.write(formatCurrentSession(historyEntry));
+    return 0;
+  }
+
+  if (options.clear) {
+    await clearLoadedSessionId(shellScopeId);
+    stdout.write("Cleared current session\n");
+    return 0;
+  }
 
   if (options.loadSessionRef) {
     const historyItems = await loadHistoryIndex();
@@ -124,7 +149,7 @@ export async function runCli(
   const historyItems = await loadHistoryIndex();
   const activeSessionRef = options.multi
     ? undefined
-    : options.sessionRef ?? readSessionRefFromEnv(env) ?? (await getLoadedSessionId(shellScopeId));
+    : options.sessionRef ?? sessionRefFromEnv ?? (await getLoadedSessionId(shellScopeId));
   const historyEntry = activeSessionRef ? resolveHistoryEntry(historyItems, activeSessionRef) : undefined;
   const priorMessages = historyEntry
     ? await loadHistoryMessages(historyEntry)
@@ -185,6 +210,8 @@ export function parseArgs(args) {
     configUpdates: [],
     historyCommand: undefined,
     historyTarget: undefined,
+    clear: false,
+    current: false,
     loadSessionRef: undefined,
     messageParts: [],
     multi: false,
@@ -245,6 +272,16 @@ export function parseArgs(args) {
     if (arg === "--load") {
       options.loadSessionRef = readNextValue(args, index, "--load");
       index += 1;
+      continue;
+    }
+
+    if (arg === "--clear") {
+      options.clear = true;
+      continue;
+    }
+
+    if (arg === "--current") {
+      options.current = true;
       continue;
     }
 
@@ -312,16 +349,68 @@ function validateOptions(options) {
     throw new Error("--load cannot be combined with a message");
   }
 
+  if (options.clear && options.message) {
+    throw new Error("--clear cannot be combined with a message");
+  }
+
+  if (options.current && options.message) {
+    throw new Error("--current cannot be combined with a message");
+  }
+
   if (options.loadSessionRef && options.multi) {
     throw new Error("--load cannot be combined with --multi");
+  }
+
+  if (options.clear && options.multi) {
+    throw new Error("--clear cannot be combined with --multi");
+  }
+
+  if (options.current && options.multi) {
+    throw new Error("--current cannot be combined with --multi");
   }
 
   if (options.loadSessionRef && options.sessionRef) {
     throw new Error("--load cannot be combined with --session");
   }
 
+  if (options.clear && options.sessionRef) {
+    throw new Error("--clear cannot be combined with --session");
+  }
+
+  if (options.current && options.sessionRef) {
+    throw new Error("--current cannot be combined with --session");
+  }
+
+  if (options.clear && options.loadSessionRef) {
+    throw new Error("--clear cannot be combined with --load");
+  }
+
+  if (options.current && options.loadSessionRef) {
+    throw new Error("--current cannot be combined with --load");
+  }
+
+  if (options.clear && options.historyCommand) {
+    throw new Error("--clear cannot be combined with --history");
+  }
+
+  if (options.current && options.historyCommand) {
+    throw new Error("--current cannot be combined with --history");
+  }
+
   if (Object.keys(options.configUpdates).length > 0 && options.message) {
     throw new Error("--config cannot be combined with a message");
+  }
+
+  if (options.clear && Object.keys(options.configUpdates).length > 0) {
+    throw new Error("--clear cannot be combined with --config");
+  }
+
+  if (options.current && Object.keys(options.configUpdates).length > 0) {
+    throw new Error("--current cannot be combined with --config");
+  }
+
+  if (options.current && options.clear) {
+    throw new Error("--current cannot be combined with --clear");
   }
 }
 
@@ -351,6 +440,15 @@ function formatHistoryShow(historyEntry, messages) {
     .join("\n\n");
 
   return `${header}\n\n${body}\n`;
+}
+
+function formatCurrentSession(historyEntry) {
+  return [
+    `sessionId: ${historyEntry.sessionId}`,
+    `shortId: ${buildShortSessionId(historyEntry.sessionId)}`,
+    `title: ${historyEntry.title}`,
+    `updateTime: ${historyEntry.updateTime}`
+  ].join("\n") + "\n";
 }
 
 function readSessionRefFromEnv(env) {
