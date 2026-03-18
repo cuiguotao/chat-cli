@@ -1,6 +1,6 @@
 {
   "name": "@kairyyy/chat-cli",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Minimal AI chat CLI for OpenAI-compatible APIs",
   "private": false,
   "type": "module",
