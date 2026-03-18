@@ -1,6 +1,22 @@
 # chat-cli
 
+[中文](./README.md) | [English](./README.en.md)
+
 一个最小可运行的 CLI AI 工具，支持 OpenAI API 兼容格式的模型，并通过命令行发起临时对话。
+
+## 安装
+
+通过 npm 全局安装：
+
+```powershell
+npm install -g @kairyyy/chat-cli
+```
+
+安装后可直接使用：
+
+```powershell
+chat "你好"
+```
 
 ## 使用前准备
 
