@@ -1,0 +1,17 @@
+{
+  "name": "chat-cli",
+  "version": "0.1.0",
+  "description": "Minimal AI chat CLI for OpenAI-compatible APIs",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "chat": "./bin/chat.js"
+  },
+  "scripts": {
+    "start": "node ./bin/chat.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
