@@ -212,7 +212,8 @@ test("runCli renders markdown when stream is disabled", async () => {
   });
 
   assert.equal(exitCode, 0);
-  assert.equal(stdout, "渲染后的终端内容\n");
+  assert.match(stdout, /Assistant/);
+  assert.match(stdout, /渲染后的终端内容/);
 });
 
 test("runCli uses an explicitly selected session for multi-turn conversation", async () => {
@@ -482,6 +483,39 @@ test("runCli lists history sessions with short ids", async () => {
   assert.equal(stdout, "sessionId\ttitle\tupdateTime\n12345678\t第一轮标题\t2026-03-18T10:00:00.000Z\n");
 });
 
+test("runCli renders history list as a TUI view when stdout is a terminal", async () => {
+  let stdout = "";
+
+  const exitCode = await runCli(["chat", "--history", "list"], {
+    env: {},
+    stdout: {
+      isTTY: true,
+      columns: 72,
+      write(chunk) {
+        stdout += chunk;
+      }
+    },
+    stderr: {
+      write() {}
+    },
+    loadHistoryIndex: async () => [
+      {
+        sessionId: "12345678-abcd",
+        title: "第一轮标题",
+        startMessage: "第一轮标题",
+        createTime: "2026-03-18T09:30:00.000Z",
+        updateTime: "2026-03-18T10:00:00.000Z",
+        historyPath: "20260318/12345678-abcd.jsonl"
+      }
+    ]
+  });
+
+  assert.equal(exitCode, 0);
+  assert.match(stdout, /History/);
+  assert.match(stdout, /12345678/);
+  assert.match(stdout, /╭/);
+});
+
 test("runCli shows a history session by id", async () => {
   let stdout = "";
 
@@ -692,6 +726,45 @@ test("runCli uses raw fallback output if a streaming implementation does not emi
   assert.equal(exitCode, 0);
   assert.equal(stdout, "# 标题\n\n- 第一项\n");
   assert.equal(stderr, "");
+});
+
+test("runCli shows a stream header for tty output when deltas arrive", async () => {
+  let stdout = "";
+
+  const exitCode = await runCli(["chat", "你好"], {
+    env: {
+      OPENAI_API_KEY: "test-key",
+      OPENAI_MODEL: "test-model"
+    },
+    stdout: {
+      isTTY: true,
+      columns: 72,
+      write(chunk) {
+        stdout += chunk;
+      }
+    },
+    stderr: {
+      write() {}
+    },
+    loadUserConfig: async () => ({}),
+    loadHistoryIndex: async () => [],
+    getLoadedSessionId: async () => undefined,
+    persistHistory: async () => ({
+      sessionId: "new-session-id",
+      shortSessionId: "new",
+      historyPath: "C:\\history.jsonl",
+      relativeHistoryPath: "20260318/new-session-id.jsonl"
+    }),
+    chat: async (config) => {
+      config.onDelta("你好，");
+      config.onDelta("我在。");
+      return "你好，我在。";
+    }
+  });
+
+  assert.equal(exitCode, 0);
+  assert.match(stdout, /Assistant/);
+  assert.match(stdout, /你好，我在。/);
 });
 
 test("runCli returns validation error when message is missing", async () => {

@@ -15,6 +15,15 @@ import {
   setActiveSessionId
 } from "./shell-session.js";
 import { renderMarkdownForTerminal } from "./terminal-markdown.js";
+import {
+  formatAssistantResponse,
+  formatAssistantStreamHeader,
+  formatCurrentSessionView,
+  formatHelpView,
+  formatHistoryListView,
+  formatNoticeView,
+  formatSessionView
+} from "./terminal-ui.js";
 
 const HELP_TEXT = `Usage:
   chat "Your message"
@@ -62,9 +71,19 @@ export async function runCli(
   } = {}
 ) {
   const args = rawArgs[0] === "chat" ? rawArgs.slice(1) : rawArgs;
+  const interactiveOutput = isInteractiveTerminal(stdout);
+  const outputColumns = interactiveOutput ? stdout.columns : undefined;
 
   if (args.includes("--help") || args.includes("-h")) {
-    stdout.write(`${HELP_TEXT}\n`);
+    stdout.write(
+      interactiveOutput
+        ? formatHelpView({
+            configPath: getUserConfigPath(),
+            activeSessionEnvName: ACTIVE_SESSION_ENV_NAME,
+            columns: outputColumns
+          })
+        : `${HELP_TEXT}\n`
+    );
     return 0;
   }
 
@@ -89,13 +108,32 @@ export async function runCli(
     };
 
     await saveUserConfig(nextConfig, { configPath });
-    stdout.write(`Updated user config at ${configPath}: ${formatConfigUpdates(options.configUpdates)}\n`);
+    stdout.write(
+      interactiveOutput
+        ? formatNoticeView(
+            "Config Updated",
+            [
+              `Path: ${configPath}`,
+              `Changes: ${formatConfigUpdates(options.configUpdates)}`
+            ],
+            {
+              columns: outputColumns,
+              tone: "green",
+              subtitle: "User configuration saved"
+            }
+          )
+        : `Updated user config at ${configPath}: ${formatConfigUpdates(options.configUpdates)}\n`
+    );
     return 0;
   }
 
   if (options.historyCommand === "list") {
     const historyItems = await loadHistoryIndex();
-    stdout.write(formatHistoryList(historyItems));
+    stdout.write(
+      interactiveOutput
+        ? formatHistoryListView(historyItems, { columns: outputColumns })
+        : formatHistoryList(historyItems)
+    );
     return 0;
   }
 
@@ -103,7 +141,11 @@ export async function runCli(
     const historyItems = await loadHistoryIndex();
     const historyEntry = resolveHistoryEntry(historyItems, options.historyTarget);
     const messages = await loadHistoryMessages(historyEntry);
-    stdout.write(formatHistoryShow(historyEntry, messages));
+    stdout.write(
+      interactiveOutput
+        ? formatSessionView(historyEntry, messages, { columns: outputColumns })
+        : formatHistoryShow(historyEntry, messages)
+    );
     return 0;
   }
 
@@ -114,19 +156,39 @@ export async function runCli(
     const loadedSessionRef = sessionRefFromEnv ?? (await getLoadedSessionId(shellScopeId));
 
     if (!loadedSessionRef) {
-      stdout.write("No current session\n");
+      stdout.write(
+        interactiveOutput
+          ? formatNoticeView("Current Session", ["No active session loaded in this terminal."], {
+              columns: outputColumns,
+              tone: "blue",
+              subtitle: "Session state"
+            })
+          : "No current session\n"
+      );
       return 0;
     }
 
     const historyItems = await loadHistoryIndex();
     const historyEntry = resolveHistoryEntry(historyItems, loadedSessionRef);
-    stdout.write(formatCurrentSession(historyEntry));
+    stdout.write(
+      interactiveOutput
+        ? formatCurrentSessionView(historyEntry, { columns: outputColumns })
+        : formatCurrentSession(historyEntry)
+    );
     return 0;
   }
 
   if (options.clear) {
     await clearLoadedSessionId(shellScopeId);
-    stdout.write("Cleared current session\n");
+    stdout.write(
+      interactiveOutput
+        ? formatNoticeView("Session Cleared", ["The active session was removed from this terminal."], {
+            columns: outputColumns,
+            tone: "blue",
+            subtitle: "Session state"
+          })
+        : "Cleared current session\n"
+    );
     return 0;
   }
 
@@ -134,7 +196,22 @@ export async function runCli(
     const historyItems = await loadHistoryIndex();
     const historyEntry = resolveHistoryEntry(historyItems, options.loadSessionRef);
     await saveLoadedSessionId(shellScopeId, historyEntry.sessionId);
-    stdout.write(`Loaded session ${buildShortSessionId(historyEntry.sessionId)}\n`);
+    stdout.write(
+      interactiveOutput
+        ? formatNoticeView(
+            "Session Loaded",
+            [
+              `Short ID: ${buildShortSessionId(historyEntry.sessionId)}`,
+              `Title: ${historyEntry.title}`
+            ],
+            {
+              columns: outputColumns,
+              tone: "green",
+              subtitle: "Ready for follow-up prompts"
+            }
+          )
+        : `Loaded session ${buildShortSessionId(historyEntry.sessionId)}\n`
+    );
     return 0;
   }
 
@@ -155,12 +232,18 @@ export async function runCli(
     ? await loadHistoryMessages(historyEntry)
     : [];
   let hasStreamedOutput = false;
+  let hasRenderedStreamHeader = false;
 
   const response = await chat({
     ...config,
     priorMessages,
     onDelta: config.stream
       ? (chunk) => {
+          if (interactiveOutput && !hasRenderedStreamHeader) {
+            stdout.write(formatAssistantStreamHeader({ columns: outputColumns }));
+            hasRenderedStreamHeader = true;
+          }
+
           hasStreamedOutput = true;
           stdout.write(chunk);
         }
@@ -200,7 +283,11 @@ export async function runCli(
     ? renderMarkdown(response, { columns: stdout.columns })
     : response;
 
-  stdout.write(`${renderedResponse}\n`);
+  stdout.write(
+    interactiveOutput
+      ? `${formatAssistantResponse(renderedResponse, { columns: outputColumns })}\n`
+      : `${renderedResponse}\n`
+  );
 
   return 0;
 }
@@ -518,4 +605,8 @@ function readNextValue(args, index, optionName) {
   }
 
   return nextValue;
+}
+
+function isInteractiveTerminal(output) {
+  return Boolean(output?.isTTY);
 }
