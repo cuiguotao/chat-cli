@@ -91,6 +91,7 @@ chat --history list
 chat --history show 12345678
 chat --load 12345678
 chat --current
+chat --current show
 chat --clear
 chat --session 12345678 "Continue this conversation"
 chat --multi "Start a multi-turn conversation"
@@ -179,6 +180,14 @@ chat --current
 ```
 
 If the terminal already has an active session, the CLI shows the full `sessionId`, short id, title, and update time. If there is no active session, it prints `No current session`.
+
+Show the full transcript of the session currently active in the current terminal window:
+
+```powershell
+chat --current show
+```
+
+This prints the complete message history for the active session, equivalent to looking up the current session id first and then running `chat --history show <sessionId>`.
 
 Clear the currently loaded session in the current terminal window:
 

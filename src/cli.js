@@ -31,6 +31,7 @@ const HELP_TEXT = `Usage:
   chat --session sessionId "Continue a session"
   chat --load sessionId
   chat --current
+  chat --current show
   chat --clear
   chat --history list
   chat --history show sessionId
@@ -170,6 +171,16 @@ export async function runCli(
 
     const historyItems = await loadHistoryIndex();
     const historyEntry = resolveHistoryEntry(historyItems, loadedSessionRef);
+    if (options.currentCommand === "show") {
+      const messages = await loadHistoryMessages(historyEntry);
+      stdout.write(
+        interactiveOutput
+          ? formatSessionView(historyEntry, messages, { columns: outputColumns })
+          : formatHistoryShow(historyEntry, messages)
+      );
+      return 0;
+    }
+
     stdout.write(
       interactiveOutput
         ? formatCurrentSessionView(historyEntry, { columns: outputColumns })
@@ -299,6 +310,7 @@ export function parseArgs(args) {
     historyTarget: undefined,
     clear: false,
     current: false,
+    currentCommand: undefined,
     loadSessionRef: undefined,
     messageParts: [],
     multi: false,
@@ -369,6 +381,12 @@ export function parseArgs(args) {
 
     if (arg === "--current") {
       options.current = true;
+
+      if (args[index + 1] && !args[index + 1].startsWith("--")) {
+        options.currentCommand = args[index + 1];
+        index += 1;
+      }
+
       continue;
     }
 
@@ -426,6 +444,10 @@ function validateOptions(options) {
 
   if (options.historyCommand === "show" && !options.historyTarget) {
     throw new Error("--history show requires a sessionId");
+  }
+
+  if (options.currentCommand && options.currentCommand !== "show") {
+    throw new Error("--current only supports show");
   }
 
   if (options.historyCommand && options.message) {

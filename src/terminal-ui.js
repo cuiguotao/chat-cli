@@ -32,6 +32,7 @@ export function formatHelpView({ configPath, activeSessionEnvName, columns }) {
     '  chat --session sessionId "Continue a session"',
     "  chat --load sessionId",
     "  chat --current",
+    "  chat --current show",
     "  chat --clear",
     "",
     "History",

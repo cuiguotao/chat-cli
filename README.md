@@ -83,6 +83,7 @@ chat --history list
 chat --history show 12345678
 chat --load 12345678
 chat --current
+chat --current show
 chat --clear
 chat --session 12345678 "继续这个会话"
 chat --multi "开始一个多轮会话"
@@ -168,6 +169,14 @@ chat --current
 ```
 
 如果当前终端已经加载了会话，会显示当前的完整 `sessionId`、短 id、标题和更新时间；如果没有活动会话，则会提示 `No current session`。
+
+查看当前终端窗口正在使用的会话全文：
+
+```powershell
+chat --current show
+```
+
+这个命令会直接输出当前活动会话的完整消息内容，效果等同于先查询当前会话 id 再执行一次 `chat --history show <sessionId>`。
 
 清空当前终端窗口里已加载的会话：
 

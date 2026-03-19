@@ -15,6 +15,7 @@ test("parseArgs supports config, session, history, load, and multi options", () 
     "--config",
     "stream=false",
     "--current",
+    "show",
     "--clear",
     "--history",
     "show",
@@ -30,6 +31,7 @@ test("parseArgs supports config, session, history, load, and multi options", () 
     stream: false
   });
   assert.equal(parsed.current, true);
+  assert.equal(parsed.currentCommand, "show");
   assert.equal(parsed.clear, true);
   assert.equal(parsed.historyCommand, "show");
   assert.equal(parsed.historyTarget, "history-123");
@@ -666,6 +668,56 @@ test("runCli shows the current session for the current shell scope", async () =>
   );
 });
 
+test("runCli shows the full current session transcript", async () => {
+  let stdout = "";
+
+  const exitCode = await runCli(["chat", "--current", "show"], {
+    env: {},
+    stdout: {
+      write(chunk) {
+        stdout += chunk;
+      }
+    },
+    stderr: {
+      write() {}
+    },
+    getShellScopeId: () => "ppid:55",
+    getLoadedSessionId: async (scopeId) => {
+      assert.equal(scopeId, "ppid:55");
+      return "12345678-abcd";
+    },
+    loadHistoryIndex: async () => [
+      {
+        sessionId: "12345678-abcd",
+        title: "第一轮标题",
+        startMessage: "第一轮标题",
+        createTime: "2026-03-18T09:30:00.000Z",
+        updateTime: "2026-03-18T10:00:00.000Z",
+        historyPath: "20260318/12345678-abcd.jsonl"
+      }
+    ],
+    loadHistoryMessages: async (entry) => {
+      assert.equal(entry.sessionId, "12345678-abcd");
+      return [
+        {
+          role: "user",
+          content: "你好"
+        },
+        {
+          role: "assistant",
+          content: "你好，我在。"
+        }
+      ];
+    }
+  });
+
+  assert.equal(exitCode, 0);
+  assert.equal(
+    stdout,
+    "sessionId: 12345678-abcd\nshortId: 12345678\ntitle: 第一轮标题\nupdateTime: 2026-03-18T10:00:00.000Z\nhistoryPath: 20260318/12345678-abcd.jsonl\n\nuser:\n你好\n\nassistant:\n你好，我在。\n"
+  );
+});
+
 test("runCli reports when there is no current session", async () => {
   let stdout = "";
 
@@ -846,6 +898,25 @@ test("runCli validates conflicting current options", async () => {
 
   assert.equal(exitCode, 1);
   assert.match(stderr, /--current cannot be combined with --clear/i);
+});
+
+test("runCli validates unsupported current subcommands", async () => {
+  let stderr = "";
+
+  const exitCode = await runCli(["chat", "--current", "list"], {
+    env: {},
+    stdout: {
+      write() {}
+    },
+    stderr: {
+      write(chunk) {
+        stderr += chunk;
+      }
+    }
+  });
+
+  assert.equal(exitCode, 1);
+  assert.match(stderr, /--current only supports show/i);
 });
 
 test("runCli validates that --history show requires a session id", async () => {
