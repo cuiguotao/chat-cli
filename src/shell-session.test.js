@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  clearActiveSessionId,
   getActiveSessionId,
   getActiveSessionStatePath,
   getShellSessionScopeId,
@@ -90,4 +91,38 @@ test("getActiveSessionId returns the scope specific session id", async () => {
   });
 
   assert.equal(sessionId, "session-123");
+});
+
+test("clearActiveSessionId removes the scope mapping", async () => {
+  const writeFileCalls = [];
+
+  await clearActiveSessionId("ppid:99", {
+    statePath: "C:\\Users\\Demo\\.chat-cli\\runtime\\active-sessions.json",
+    mkdirImpl: async () => {},
+    readFileImpl: async () =>
+      JSON.stringify({
+        "ppid:99": "session-123",
+        "ppid:100": "session-999"
+      }),
+    writeFileImpl: async (filePath, content, options) => {
+      writeFileCalls.push({ filePath, content, options });
+    }
+  });
+
+  assert.equal(writeFileCalls.length, 1);
+  assert.equal(writeFileCalls[0].filePath, "C:\\Users\\Demo\\.chat-cli\\runtime\\active-sessions.json");
+  assert.equal(
+    writeFileCalls[0].content,
+    `${JSON.stringify(
+      {
+        "ppid:100": "session-999"
+      },
+      null,
+      2
+    )}\n`
+  );
+  assert.deepEqual(writeFileCalls[0].options, {
+    encoding: "utf8",
+    flag: "w"
+  });
 });

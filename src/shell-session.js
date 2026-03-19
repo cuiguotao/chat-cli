@@ -74,6 +74,37 @@ export async function setActiveSessionId(
   return nextState;
 }
 
+export async function clearActiveSessionId(
+  scopeId,
+  {
+    statePath = getActiveSessionStatePath(),
+    mkdirImpl = mkdir,
+    readFileImpl = readFile,
+    writeFileImpl = writeFile
+  } = {}
+) {
+  const state = await readActiveSessionState({
+    statePath,
+    readFileImpl
+  });
+
+  if (!(scopeId in state)) {
+    return state;
+  }
+
+  const nextState = Object.fromEntries(
+    Object.entries(state).filter(([key]) => key !== scopeId)
+  );
+
+  await mkdirImpl(path.dirname(statePath), { recursive: true });
+  await writeFileImpl(statePath, `${JSON.stringify(nextState, null, 2)}\n`, {
+    encoding: "utf8",
+    flag: "w"
+  });
+
+  return nextState;
+}
+
 export async function readActiveSessionState(
   {
     statePath = getActiveSessionStatePath(),

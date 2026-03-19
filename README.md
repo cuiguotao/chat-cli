@@ -82,6 +82,8 @@ chat --system "你是一个简洁的助手" "解释一下 CLI 的作用"
 chat --history list
 chat --history show 12345678
 chat --load 12345678
+chat --current
+chat --clear
 chat --session 12345678 "继续这个会话"
 chat --multi "开始一个多轮会话"
 chat --config stream=false
@@ -158,6 +160,22 @@ chat --load 12345678
 ```
 
 加载之后，如果后续执行 `chat "下一句话"` 时没有显式传 `--session`，CLI 会优先继续当前终端窗口里已加载的会话。
+
+查看当前终端窗口正在使用的会话：
+
+```powershell
+chat --current
+```
+
+如果当前终端已经加载了会话，会显示当前的完整 `sessionId`、短 id、标题和更新时间；如果没有活动会话，则会提示 `No current session`。
+
+清空当前终端窗口里已加载的会话：
+
+```powershell
+chat --clear
+```
+
+执行后，当前终端会回到“没有活动会话”的状态，后续普通 `chat "message"` 会重新按单轮会话处理，直到你再次执行 `--load` 或 `--multi`。这个命令不会删除历史文件。
 
 显式继续某个历史会话：
 
